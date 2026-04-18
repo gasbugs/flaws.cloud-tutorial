@@ -51,37 +51,37 @@ jq -r 'select(.sourceIPAddress | test("^[0-9]+\\.")) | .sourceIPAddress' /tmp/al
 ```
 예상 출력:
 ```
-     63 104.102.221.250   ← 공격자 의심
-     12 10.0.0.5
-      3 203.0.113.99
+     27 104.102.221.250   ← 공격자 의심 (다수 호출)
+      5 34.234.236.212   ← 낮은 빈도 — 기존 스캐너/봇일 수 있음
 ```
 
 ### 2. 의심 IP 의 이벤트 종류 확인
 ```bash
 jq -r 'select(.sourceIPAddress=="104.102.221.250") | .eventName' /tmp/all.ndjson \
   | sort | uniq -c | sort -rn
-# 23 ListFunctions
-# 12 GetFunction
-#  7 GetCallerIdentity
-#  ... 
+# 17 GetObject
+#  4 ListObjects
+#  3 ListImages          ← ECR 이미지 목록(Attacker L2)
+#  2 BatchGetImage
+#  1 GetAuthorizationToken
 ```
-공격자의 활동 패턴이 명확히 보인다: **ListFunctions, GetFunction → Lambda 정찰**.
+공격자 패턴이 그대로 보인다: **S3 GetObject / ListObjects(비밀 파일 조회) + ECR ListImages/BatchGetImage(컨테이너 이미지 추출)**.
 
 ### 3. 공격자의 UserIdentity 추적
 ```bash
 jq -c 'select(.sourceIPAddress=="104.102.221.250") | {eventTime, eventName, userIdentity}' \
   /tmp/all.ndjson | head -5
 ```
-출력에 `userIdentity.type` 이 `AssumedRole`, `principalId` 가 `AROAJQMBDNUMIKLZKMF64:CognitoIdentityCredentials` 같이 나온다 — **Cognito 미인증 자격증명** 이 쓰였음을 확정.
+출력에 `userIdentity.type` 이 `AssumedRole`, `userIdentity.sessionContext.sessionIssuer.userName` 이 `level1` 로 나온다 — **Attacker L1 에서 Lambda 에러로 흘러나온 `level1` 역할 자격증명** 이 쓰였음을 확정.
 
 ### 4. 공격 윈도우
 ```bash
 jq -r 'select(.sourceIPAddress=="104.102.221.250") | .eventTime' /tmp/all.ndjson \
   | sort | sed -n '1p; $p'
-# 2018-11-28T22:31:00Z
-# 2018-11-28T22:41:50Z
+# 2018-11-28T22:35:00Z   (예시; 실제 값은 데이터에 따라 다름)
+# 2018-11-28T23:10:00Z
 ```
-약 11분간의 집중 공격.
+약 30분 내의 집중 공격.
 
 ### 5. 유저 에이전트
 ```bash

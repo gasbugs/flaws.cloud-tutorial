@@ -36,9 +36,9 @@
 
 ## 📚 사전 지식
 
-- S3 버킷 이름은 **DNS 이름** 이다. `flaws.cloud` 도메인은 동일한 이름의 S3 버킷을 가리킨다.
-- S3 는 **정적 웹사이트 호스팅** 기능을 지원한다. 이 경우 `http://<bucket>.s3-website-<region>.amazonaws.com/` 또는 `http://<bucket>.s3.amazonaws.com/` 으로 접근 가능하다.
-- `--no-sign-request` 는 "내 AWS 자격증명으로 서명하지 말고 익명으로 호출" 하라는 옵션이다. 공개 버킷을 조회할 때 사용한다.
+- S3 버킷 이름은 **DNS 이름** 이다. `flaws.cloud` 도메인이 곧 동일한 이름의 S3 버킷을 가리킨다.
+- S3 는 **정적 웹사이트 호스팅** 기능을 지원한다. 이 경우 `http://<bucket>.s3.amazonaws.com/` 또는 `http://<bucket>.s3-website-<region>.amazonaws.com/` 으로 접근 가능하다.
+- `--no-sign-request` 는 "내 AWS 자격증명으로 서명하지 말고 익명으로 호출" 하라는 옵션이다. 공개 버킷을 조사할 때 사용.
 - 자세한 개념은 [AWS 보안 primer §2](../docs/aws-security-primer.md#2-s3--버킷객체aclpolicyblock-public-access) 참고.
 
 ## 🔍 정찰
@@ -47,20 +47,24 @@
 
 ```bash
 dig flaws.cloud +short
-# 출력 예
-# s3-website-us-west-2.amazonaws.com.
-# 52.218.xxx.xxx
+# 출력 예 (A 레코드만 반환되어 S3 IP 풀이 보임):
+# 52.92.235.43
+# 3.5.80.237
+# ...
 ```
 
-`s3-website-us-west-2.amazonaws.com` — **S3 정적 웹 호스팅** 이자 리전은 **us-west-2 (Oregon)** 이라는 두 가지 사실을 한 줄로 알 수 있다. flaws.cloud 의 모든 레벨이 이 리전에 있다.
+> 💡 예전에는 `dig` 가 `s3-website-us-west-2.amazonaws.com.` CNAME 을 함께 보여줬지만, 2024 년 이후 AWS DNS 가 A 레코드만 리턴하도록 바뀌었다. 대신 **버킷 경로로 직접 HEAD 요청**을 보내면 한 줄로 판명된다.
 
-### 2단계. 버킷 헤더로 리전 재확인
+### 2단계. 버킷 경로로 리전 확인 (정설 방법)
 
 ```bash
-curl -sI http://flaws.cloud/ | grep -i region
-# 출력 예
+curl -sI http://flaws.cloud.s3.amazonaws.com/ | grep -i region
 # x-amz-bucket-region: us-west-2
 ```
+
+이 한 줄로 **도메인이 S3 버킷**이며 **리전이 `us-west-2`** 임을 확정한다.
+
+> ⚠️ `curl -sI http://flaws.cloud/` 는 S3 **웹사이트 호스팅** 엔드포인트를 거치므로 `x-amz-bucket-region` 헤더가 보이지 않는다. 버킷 네이티브 엔드포인트(`...s3.amazonaws.com`)를 써야 한다.
 
 ## 🧨 취약점 원리
 
@@ -80,11 +84,11 @@ aws s3 ls s3://flaws.cloud/ --no-sign-request --region us-west-2
 
 예상 출력:
 ```
-2017-03-14 05:00:38       2575 hint1.html
+2017-03-14 12:00:38       2575 hint1.html
 2017-03-03 13:05:17       1707 hint2.html
 2017-03-03 13:05:11       1101 hint3.html
-2017-03-03 13:05:07       3162 index.html
-2018-07-10 13:47:17      15979 logo.png
+2024-02-22 11:32:41       2861 index.html
+2018-07-11 01:47:16      15979 logo.png
 2017-02-27 10:59:28         46 robots.txt
 2017-02-27 10:59:30       1051 secret-dd02c7c.html
 ```
@@ -94,15 +98,15 @@ aws s3 ls s3://flaws.cloud/ --no-sign-request --region us-west-2
 ### 2. 비밀 파일 열어보기
 
 ```bash
-curl -s http://flaws.cloud/secret-dd02c7c.html | grep -Eo 'http[s]?://[^"]+flaws.cloud[^"]*'
+curl -s http://flaws.cloud/secret-dd02c7c.html | grep -Eo 'http[s]?://[^"]+flaws.cloud[^"]*' | head -1
 ```
 
-또는 그냥 브라우저로:
-```
-http://flaws.cloud/secret-dd02c7c.html
-```
+또는 그냥 브라우저로 `http://flaws.cloud/secret-dd02c7c.html` 접속.
 
-페이지 안에 **다음 레벨 URL** 이 박혀 있다.
+페이지 본문 예:
+```html
+Level 2 is at <a href="http://level2-c8b217a33fcf1f839f6f1f73a00a9ae7.flaws.cloud">...</a>
+```
 
 ## 🚪 정답 & 다음 레벨
 
@@ -167,6 +171,7 @@ aws s3api put-public-access-block \
 ## ✅ 체크리스트
 
 - [ ] `aws s3 ls s3://flaws.cloud/ --no-sign-request --region us-west-2` 로 파일 목록 획득 재현
+- [ ] `curl -sI http://flaws.cloud.s3.amazonaws.com/` 로 `x-amz-bucket-region: us-west-2` 확인
 - [ ] `secret-dd02c7c.html` 에서 다음 레벨 URL 확인
 - [ ] 본인 AWS 계정에서 테스트 버킷을 만들고 `--no-sign-request` 로 리스팅 시도 → BPA 로 차단되는 것 확인
 - [ ] 위 버킷 정책 JSON 을 적용해 "GetObject 는 되지만 ListBucket 은 실패" 상태 재현

@@ -102,7 +102,7 @@ aws configure --profile flaws
 
 aws sts get-caller-identity --profile flaws
 # {
-#   "UserId": "AIDAIRMDOSCWGLCDWOG6A",
+#   "UserId": "AIDA...",  # 값은 계정/시점에 따라 달라짐
 #   "Account": "975426262029",
 #   "Arn": "arn:aws:iam::975426262029:user/backup"
 # }

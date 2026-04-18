@@ -13,7 +13,7 @@ Defender 4 에서 만든 테이블을 가지고, **"이 공격의 전체 서사"
 <details>
 <summary><b>Hint 1</b></summary>
 
-> `userIdentity.arn` 중 `assumed-role/*Level1Unauth*` 같은 이름이 단서.
+> `userIdentity.arn` 중 `assumed-role/level1/level1` 같은 Lambda 실행 역할이 **외부 IP**에서 보이면 단서.
 
 </details>
 
@@ -87,15 +87,13 @@ WHERE sourceIpAddress = '104.102.221.250'
 ORDER BY r.arn;
 ```
 
-## 🧩 서사 조립 (요청 답안 예)
+## 🧩 서사 조립 (flaws2 실제 로그 기반)
 
-1. **2018-11-28 22:31** — 공격자 IP `104.102.221.250` 에서 `GetId` (Cognito) 호출 → Identity 생성
-2. **22:31:05** — `GetCredentialsForIdentity` → ASIA 키 발급 (`assumed-role/Cognito_Level1Unauth_Role`)
-3. **22:32:00** — `lambda:ListFunctions` → `level1`, `level2` 함수 식별
-4. **22:32:11 / 22:32:13** — `lambda:GetFunction level1`, `level2` → 소스 zip URL 확보
-5. **22:35 이후** — ECR `DescribeRepositories`, `GetRepositoryPolicy` 로 컨테이너 정찰
-6. **22:38** — 공격자가 컨테이너 이미지 pull → 내부 키 발견
-7. **22:41** — 내부 키로 `s3:ListAllMyBuckets` → 최종 버킷 접근
+1. **2018-11-28 ~23:02** — 공격자 IP `104.102.221.250` 가 `level1` Lambda 역할 자격증명(Attacker L1 의 `?code=a` env dump 유출분)으로 `s3:GetObject s3://level1.flaws2.cloud/hint*.htm`
+2. **23:02~23:04** — `ListObjects` + `GetObject secret-ppxVFdw...` → Attacker L1 의 비밀 페이지 확보
+3. **23:05~23:07** — `ecr:ListImages level2`, `ecr:BatchGetImage` → Attacker L2 의 Docker 이미지 manifest/config 추출 → `flaws2:secret_password` 발견
+4. **(이후)** — 컨테이너 타겟에 Basic Auth 로그인 → 프록시로 Task Metadata 접근 → Task Role 탈취 → `the-end-...` 버킷 도달
+   (마지막 단계는 프록시 내부 호출이라 CloudTrail Management Event 에는 흔적이 적음 — `GetObject s3://the-end-...` 정도만 남음)
 
 ## 🛡 방어 대책 요약 (전체 트랙)
 

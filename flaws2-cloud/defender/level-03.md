@@ -47,32 +47,41 @@ jq -r 'select(.sourceIPAddress=="104.102.221.250")
 ```
 예상:
 ```
- 23 ListFunctions           SUCCESS
- 15 GetFunction             SUCCESS
-  8 Invoke                  AccessDenied
-  5 ListBuckets             AccessDenied
-  4 GetCallerIdentity       SUCCESS
+ 15 GetObject               SUCCESS
+  4 ListObjects             SUCCESS
+  3 ListImages              SUCCESS
+  2 GetObject               NoSuchKey
+  2 BatchGetImage           SUCCESS
+  1 GetAuthorizationToken   SUCCESS
 ```
-**권한 경계 테스트** — AccessDenied 이 다양한 eventName 에 나타남.
+**권한 경계 테스트** 흔적 — `NoSuchKey` 는 공격자가 **경로를 추측**하고 있었다는 단서.
 
-### 2. 공격자가 건드린 Lambda 함수
+### 2. 공격자가 건드린 S3 객체
 ```bash
-jq -c 'select(.sourceIPAddress=="104.102.221.250" and .eventSource=="lambda.amazonaws.com")
-       | {eventTime, eventName, fn: .requestParameters.functionName}' /tmp/all.ndjson
+jq -c 'select(.sourceIPAddress=="104.102.221.250" and .eventSource=="s3.amazonaws.com")
+       | {eventTime, eventName,
+          bucket: .requestParameters.bucketName,
+          key: .requestParameters.key}' /tmp/all.ndjson | head -10
 ```
 예상:
 ```json
-{"eventTime":"2018-11-28T22:32:11Z","eventName":"GetFunction","fn":"level1"}
-{"eventTime":"2018-11-28T22:32:13Z","eventName":"GetFunction","fn":"level2"}
+{"eventTime":"2018-11-28T23:02:56Z","eventName":"GetObject","bucket":"level1.flaws2.cloud","key":"secret-ppxVFdwV4DDtZm8vbQRvhxL8mE6wxNco.html"}
+{"eventTime":"2018-11-28T23:04:54Z","eventName":"ListObjects","bucket":"level1.flaws2.cloud"}
 ```
-`level1`, `level2` Lambda 를 GET — 소스 다운로드 성공 여부는 `errorCode` 로 확인.
+→ 공격자가 `level1.flaws2.cloud` 버킷을 리스팅 후 비밀 HTML 을 꺼낸 흔적.
 
-### 3. 공격자가 얻은 자격증명 체인
+### 3. ECR 이미지 추출 흔적 (Attacker L2)
 ```bash
-jq -c 'select(.sourceIPAddress=="104.102.221.250" and .eventName=="GetCredentialsForIdentity")
-       | {eventTime, .requestParameters, .responseElements}' /tmp/all.ndjson
+jq -c 'select(.sourceIPAddress=="104.102.221.250" and .eventSource=="ecr.amazonaws.com")
+       | {eventTime, eventName,
+          repo: .requestParameters.repositoryName}' /tmp/all.ndjson
 ```
-Cognito 가 ASIA 임시 키를 발급한 시각이 나온다. 이후 이 키로 다른 API 호출이 이어진다.
+예상:
+```json
+{"eventTime":"2018-11-28T23:05:53Z","eventName":"ListImages","repo":"level2"}
+{"eventTime":"2018-11-28T23:07:01Z","eventName":"BatchGetImage","repo":"level2"}
+```
+→ `level2` ECR 레포에서 이미지 manifest/config 를 꺼냈다 = 자격증명(htpasswd)이 유출됐을 가능성.
 
 ### 4. 시간 순 타임라인 (미니 버전)
 ```bash
