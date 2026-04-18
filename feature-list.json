@@ -40,7 +40,7 @@
       "name": "flaws.cloud Level 2 — AuthenticatedUsers ACL",
       "description": "flaws-cloud/level-02.md. 본인 AWS 계정으로 리스팅 가능한 이유(AuthenticatedUsers 그룹), aws configure / aws s3 ls --profile 실행, 방어 대책(ACL 대신 버킷 정책, Block Public Access).",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-005.sh"
     },
     {
@@ -48,7 +48,7 @@
       "name": "flaws.cloud Level 3 — .git 히스토리 속 access key",
       "description": "flaws-cloud/level-03.md. .git 디렉터리 노출 인식, wget -r 또는 aws s3 sync, git log + git show 로 이전 커밋에서 AKIA 키 복원, aws configure --profile flaws 로 L4 버킷 리스팅. 방어: .gitignore, BFG / git-filter-repo, 시크릿 스캔.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-006.sh"
     },
     {
@@ -56,7 +56,7 @@
       "name": "flaws.cloud Level 4 — 공개 EBS 스냅샷",
       "description": "flaws-cloud/level-04.md. HTTP Basic Auth 웹페이지, describe-snapshots --owner-ids 로 flaws 계정 공개 스냅샷 식별, create-volume → attach → mount, /etc/nginx/.htpasswd 해시 크랙 → L5 서브도메인 획득. 방어: 스냅샷 기본 비공개, Config 규칙.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-007.sh"
     },
     {
@@ -64,7 +64,7 @@
       "name": "flaws.cloud Level 5 — IMDSv1 SSRF",
       "description": "flaws-cloud/level-05.md. /proxy/ URL 이용, 169.254.169.254/latest/meta-data/ 호출, iam/security-credentials/flaws 로 STS 임시 키 탈취, 환경변수로 자격증명 설정 후 L6 버킷 리스팅. 방어: IMDSv2 강제, 프록시 필터링.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-008.sh"
     },
     {
@@ -72,7 +72,7 @@
       "name": "flaws.cloud Level 6 — SecurityAudit 권한 남용",
       "description": "flaws-cloud/level-06.md. 주어진 access key로 get-user / list-attached-user-policies, SecurityAudit 정책으로 Lambda 함수 나열, get-policy → API Gateway URL 확인, URL 방문으로 플래그. 방어: 최소권한, 읽기 정책도 민감함.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-009.sh"
     },
     {
