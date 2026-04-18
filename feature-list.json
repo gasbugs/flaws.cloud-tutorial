@@ -1,0 +1,159 @@
+{
+  "schema_version": "1.0",
+  "project": "flaws.cloud-tutorial",
+  "last_updated": "2026-04-18",
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "저장소 스캐폴드",
+      "description": "최상위 README.md, LICENSE(MIT), 디렉터리 구조(docs/, flaws-cloud/, flaws2-cloud/attacker/, flaws2-cloud/defender/, assets/), docs/00-prerequisites.md, tests/e2e/lib/common.sh 공용 테스트 라이브러리를 생성한다.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: tests/e2e/test_feat-001.sh (디렉터리와 필수 파일 존재 확인) / 증거: test 출력 + git log"
+    },
+    {
+      "id": "feat-002",
+      "name": "AWS 보안 primer",
+      "description": "docs/aws-security-primer.md 작성. S3 버킷·ACL/정책, IAM 사용자/역할/정책/STS, IMDS v1/v2, CloudTrail, Lambda/ECS 기본 보안 개념을 한국어로 정리. flaws2 시작 전 필독 문서.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-002.sh (섹션/코드블록/플레이스홀더 없음) / 증거: test 출력"
+    },
+    {
+      "id": "feat-003",
+      "name": "flaws-cloud 색인 README",
+      "description": "flaws-cloud/README.md — 6개 레벨 요약표(URL, 핵심 기술, 난이도), 권장 학습 순서, 각 level-XX.md로의 링크.",
+      "priority": "medium",
+      "passes": false,
+      "notes": "검증: test_feat-003.sh (레벨 1~6 내부 링크 유효) / 증거: test 출력"
+    },
+    {
+      "id": "feat-004",
+      "name": "flaws.cloud Level 1 — S3 버킷 공개 리스팅",
+      "description": "flaws-cloud/level-01.md. 서브도메인이 S3 버킷임을 파악, --no-sign-request 로 버킷 리스팅, secret-*.html 찾기, 방어 대책(Block Public Access, 버킷 정책 예시 JSON).",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-004.sh (템플릿 전 섹션·명령 블록 2개 이상) / 증거: test 출력"
+    },
+    {
+      "id": "feat-005",
+      "name": "flaws.cloud Level 2 — AuthenticatedUsers ACL",
+      "description": "flaws-cloud/level-02.md. 본인 AWS 계정으로 리스팅 가능한 이유(AuthenticatedUsers 그룹), aws configure / aws s3 ls --profile 실행, 방어 대책(ACL 대신 버킷 정책, Block Public Access).",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-005.sh"
+    },
+    {
+      "id": "feat-006",
+      "name": "flaws.cloud Level 3 — .git 히스토리 속 access key",
+      "description": "flaws-cloud/level-03.md. .git 디렉터리 노출 인식, wget -r 또는 aws s3 sync, git log + git show 로 이전 커밋에서 AKIA 키 복원, aws configure --profile flaws 로 L4 버킷 리스팅. 방어: .gitignore, BFG / git-filter-repo, 시크릿 스캔.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-006.sh"
+    },
+    {
+      "id": "feat-007",
+      "name": "flaws.cloud Level 4 — 공개 EBS 스냅샷",
+      "description": "flaws-cloud/level-04.md. HTTP Basic Auth 웹페이지, describe-snapshots --owner-ids 로 flaws 계정 공개 스냅샷 식별, create-volume → attach → mount, /etc/nginx/.htpasswd 해시 크랙 → L5 서브도메인 획득. 방어: 스냅샷 기본 비공개, Config 규칙.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-007.sh"
+    },
+    {
+      "id": "feat-008",
+      "name": "flaws.cloud Level 5 — IMDSv1 SSRF",
+      "description": "flaws-cloud/level-05.md. /proxy/ URL 이용, 169.254.169.254/latest/meta-data/ 호출, iam/security-credentials/flaws 로 STS 임시 키 탈취, 환경변수로 자격증명 설정 후 L6 버킷 리스팅. 방어: IMDSv2 강제, 프록시 필터링.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-008.sh"
+    },
+    {
+      "id": "feat-009",
+      "name": "flaws.cloud Level 6 — SecurityAudit 권한 남용",
+      "description": "flaws-cloud/level-06.md. 주어진 access key로 get-user / list-attached-user-policies, SecurityAudit 정책으로 Lambda 함수 나열, get-policy → API Gateway URL 확인, URL 방문으로 플래그. 방어: 최소권한, 읽기 정책도 민감함.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-009.sh"
+    },
+    {
+      "id": "feat-010",
+      "name": "flaws2-cloud 색인 README",
+      "description": "flaws2-cloud/README.md — Attacker(Lambda/ECR/ECS) 와 Defender(CloudTrail/jq/Athena) 두 트랙 소개, 각 레벨 링크, 선택 순서 가이드.",
+      "priority": "medium",
+      "passes": false,
+      "notes": "검증: test_feat-010.sh (Attacker/Defender 각 트랙 링크 존재)"
+    },
+    {
+      "id": "feat-011",
+      "name": "flaws2 Attacker Level 1 — Lambda PIN 검증 우회",
+      "description": "flaws2-cloud/attacker/level-01.md. 페이지 소스 확인, API Gateway URL 발견, invoke 응답 구조 분석, brute force 대신 입력 유효성 검사 우회(배열/문자 casting), 환경변수 유출 방식 설명. 방어: Lambda 입력 검증, 환경변수에 비밀 보관 금지.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-011.sh"
+    },
+    {
+      "id": "feat-012",
+      "name": "flaws2 Attacker Level 2 — ECR 공개 이미지",
+      "description": "flaws2-cloud/attacker/level-02.md. 도메인이 ECS 컨테이너인 단서, Public ECR repository 목록 조회, docker pull → docker history / 이미지 내부 탐색으로 AWS 키 발견, aws s3 ls 로 L3 서브도메인.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-012.sh"
+    },
+    {
+      "id": "feat-013",
+      "name": "flaws2 Attacker Level 3 — ECS Task Metadata SSRF",
+      "description": "flaws2-cloud/attacker/level-03.md. 웹 프록시 / SSRF 로 169.254.170.2 (ECS Task metadata v2) 호출, 작업 역할 자격증명 획득, 계정 내 S3 탐색, 최종 플래그 페이지. 방어: IMDS/Task metadata 방화벽, SSRF 방지.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-013.sh"
+    },
+    {
+      "id": "feat-014",
+      "name": "flaws2 Defender Level 1 — CloudTrail 로그 확보",
+      "description": "flaws2-cloud/defender/level-01.md. 공개된 CloudTrail 로그 버킷 이름 발견, aws s3 sync 로 전체 로그 다운로드, gzip 내용 확인.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-014.sh"
+    },
+    {
+      "id": "feat-015",
+      "name": "flaws2 Defender Level 2 — jq로 공격자 IP 식별",
+      "description": "flaws2-cloud/defender/level-02.md. jq 로 sourceIPAddress / userIdentity / eventName 분류, 본인 CloudTrail과 공격자 CloudTrail 비교. 예시 jq 쿼리 다수 수록.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-015.sh"
+    },
+    {
+      "id": "feat-016",
+      "name": "flaws2 Defender Level 3 — 악의적 API 호출 패턴",
+      "description": "flaws2-cloud/defender/level-03.md. GetCallerIdentity / ListBuckets / GetObject 조합 이상 탐지, 도난 자격증명이 어느 리소스에 접근했는지 jq로 추출.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-016.sh"
+    },
+    {
+      "id": "feat-017",
+      "name": "flaws2 Defender Level 4 — Athena 환경 구성",
+      "description": "flaws2-cloud/defender/level-04.md. CloudTrail 로그용 Athena 테이블 DDL, 파티셔닝 기초, 결과 위치 S3 버킷 설정, 본인 계정에서의 재현 주의사항.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-017.sh"
+    },
+    {
+      "id": "feat-018",
+      "name": "flaws2 Defender Level 5 — Athena로 타임라인 재구성",
+      "description": "flaws2-cloud/defender/level-05.md. eventName·errorCode 집계, 공격자 행동 타임라인 SQL, 최종 답 및 대응 제안.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-018.sh"
+    },
+    {
+      "id": "feat-019",
+      "name": "GitHub public 레포 생성 및 push",
+      "description": "gh repo create gasbugs/flaws.cloud-tutorial --public --source=. --push 실행. 원격이 설정되고 모든 커밋이 push된 상태.",
+      "priority": "high",
+      "passes": false,
+      "notes": "검증: test_feat-019.sh (git remote -v로 URL 확인, gh repo view 성공) / 증거: 명령 출력"
+    }
+  ]
+}
