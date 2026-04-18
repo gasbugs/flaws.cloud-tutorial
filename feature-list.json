@@ -112,7 +112,7 @@
       "name": "flaws2 Defender Level 1 — CloudTrail 로그 확보",
       "description": "flaws2-cloud/defender/level-01.md. 공개된 CloudTrail 로그 버킷 이름 발견, aws s3 sync 로 전체 로그 다운로드, gzip 내용 확인.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-014.sh"
     },
     {
@@ -120,7 +120,7 @@
       "name": "flaws2 Defender Level 2 — jq로 공격자 IP 식별",
       "description": "flaws2-cloud/defender/level-02.md. jq 로 sourceIPAddress / userIdentity / eventName 분류, 본인 CloudTrail과 공격자 CloudTrail 비교. 예시 jq 쿼리 다수 수록.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-015.sh"
     },
     {
@@ -128,7 +128,7 @@
       "name": "flaws2 Defender Level 3 — 악의적 API 호출 패턴",
       "description": "flaws2-cloud/defender/level-03.md. GetCallerIdentity / ListBuckets / GetObject 조합 이상 탐지, 도난 자격증명이 어느 리소스에 접근했는지 jq로 추출.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-016.sh"
     },
     {
@@ -136,7 +136,7 @@
       "name": "flaws2 Defender Level 4 — Athena 환경 구성",
       "description": "flaws2-cloud/defender/level-04.md. CloudTrail 로그용 Athena 테이블 DDL, 파티셔닝 기초, 결과 위치 S3 버킷 설정, 본인 계정에서의 재현 주의사항.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-017.sh"
     },
     {
@@ -144,7 +144,7 @@
       "name": "flaws2 Defender Level 5 — Athena로 타임라인 재구성",
       "description": "flaws2-cloud/defender/level-05.md. eventName·errorCode 집계, 공격자 행동 타임라인 SQL, 최종 답 및 대응 제안.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-018.sh"
     },
     {
