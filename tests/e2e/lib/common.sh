@@ -65,5 +65,5 @@ require_link() {
 require_grep() {
   local f="$1" pat="$2"
   require_file "$f"
-  grep -qE "$pat" "${ROOT}/${f}" || _fail "패턴 없음(${pat}): ${f}"
+  grep -qE -- "$pat" "${ROOT}/${f}" || _fail "패턴 없음(${pat}): ${f}"
 }

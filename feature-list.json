@@ -24,7 +24,7 @@
       "name": "flaws-cloud 색인 README",
       "description": "flaws-cloud/README.md — 6개 레벨 요약표(URL, 핵심 기술, 난이도), 권장 학습 순서, 각 level-XX.md로의 링크.",
       "priority": "medium",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-003.sh (레벨 1~6 내부 링크 유효) / 증거: test 출력"
     },
     {
@@ -32,7 +32,7 @@
       "name": "flaws.cloud Level 1 — S3 버킷 공개 리스팅",
       "description": "flaws-cloud/level-01.md. 서브도메인이 S3 버킷임을 파악, --no-sign-request 로 버킷 리스팅, secret-*.html 찾기, 방어 대책(Block Public Access, 버킷 정책 예시 JSON).",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-004.sh (템플릿 전 섹션·명령 블록 2개 이상) / 증거: test 출력"
     },
     {
