@@ -1,8 +1,8 @@
 # Level 6 — SecurityAudit 류 읽기 권한 남용
 
-> **진입 URL**: http://level6-cc4c404a8a8b876167f5e70a7d8c9880.flaws.cloud/ddcc78ff/
-> **핵심 기술**: IAM 정책 해독 / Lambda / API Gateway
-> **난이도**: ⭐⭐⭐
+> **진입 URL**: http://level6-cc4c404a8a8b876167f5e70a7d8c9880.flaws.cloud/ddcc78ff/<br>
+> **핵심 기술**: IAM 정책 해독 / Lambda / API Gateway<br>
+> **난이도**: ⭐⭐⭐<br>
 > **본인 AWS 계정 필요**: ❌ (문제에서 access key 제공)
 
 ## 🎯 목표

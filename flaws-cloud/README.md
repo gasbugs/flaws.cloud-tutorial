@@ -15,6 +15,28 @@
 | [Level 5](level-05.md) | `level5-...flaws.cloud` | `/proxy/` SSRF → IMDSv1 역할 자격증명 | `curl`, `aws cli` | ❌ | ⭐⭐ |
 | [Level 6](level-06.md) | `level6-...flaws.cloud` | SecurityAudit 읽기권한 남용 → Lambda URL | `aws iam`, `aws lambda` | ❌ (문제에서 키 제공) | ⭐⭐⭐ |
 
+## 🔗 자격증명 체인 한눈에 보기
+
+한 레벨의 발견이 **다음 레벨의 열쇠**가 되는 것이 flaws.cloud 의 핵심 구조.
+
+```mermaid
+flowchart LR
+    A[익명<br/>--no-sign-request] -->|L1: S3 공개 리스팅| B[secret-*.html<br/>다음 버킷 이름]
+    B -->|L2: AuthenticatedUsers| C[본인 AWS 사용자<br/>any AWS principal]
+    C -->|L3: .git 히스토리| D["<b>AKIAJ3...</b><br/>IAM user: backup"]
+    D -->|L4: 공개 EBS 스냅샷| E["nginx .htpasswd<br/>flaws:nCP8..."]
+    E -->|L5: IMDSv1 SSRF| F["<b>ASIA...</b><br/>role: flaws"]
+    F -->|level6 버킷 ListBucket| G["hidden dir<br/>/ddcc78ff/"]
+    G -->|L6: SecurityAudit + apigateway:GET| H["Lambda + API Gateway<br/>theend-.../d730aa2b/"]
+
+    classDef cred fill:#ffe4b5,stroke:#d97706;
+    classDef bucket fill:#dbeafe,stroke:#2563eb;
+    classDef flag fill:#dcfce7,stroke:#16a34a;
+    class D,F cred
+    class B,E,G bucket
+    class H flag
+```
+
 ## 🧭 학습 순서
 
 1. [docs/00-prerequisites.md](../docs/00-prerequisites.md) 로 AWS CLI, jq, git 준비 확인

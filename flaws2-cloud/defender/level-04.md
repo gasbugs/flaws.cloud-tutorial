@@ -1,7 +1,7 @@
 # Defender Level 4 — Athena 환경 구성
 
-> **핵심 기술**: Amazon Athena · Glue 스키마 · 파티셔닝
-> **난이도**: ⭐⭐
+> **핵심 기술**: Amazon Athena · Glue 스키마 · 파티셔닝<br>
+> **난이도**: ⭐⭐<br>
 > **본인 AWS 계정 필요**: ✅ (Athena 쿼리 비용 발생 가능 — 센트 단위)
 
 ## 🎯 목표

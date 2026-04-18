@@ -1,9 +1,9 @@
 # Level 4 — 공개 EBS 스냅샷
 
-> **설명 페이지**: http://level4-1156739cfb264ced6de514971a4bef68.flaws.cloud/
-> **실제 공격 타겟 (EC2 nginx)**: http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/
-> **핵심 기술**: EC2 EBS 스냅샷 / 볼륨 복원 / HTTP Basic Auth
-> **난이도**: ⭐⭐⭐
+> **설명 페이지**: http://level4-1156739cfb264ced6de514971a4bef68.flaws.cloud/<br>
+> **실제 공격 타겟 (EC2 nginx)**: http://4d0cf09b9b2d761a7d87be99d17507bce8b86f3b.flaws.cloud/<br>
+> **핵심 기술**: EC2 EBS 스냅샷 / 볼륨 복원 / HTTP Basic Auth<br>
+> **난이도**: ⭐⭐⭐<br>
 > **본인 AWS 계정 필요**: ✅ (볼륨·EC2 생성)
 
 ## 🎯 목표

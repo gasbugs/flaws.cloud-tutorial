@@ -1,7 +1,7 @@
 # Defender Level 5 — Athena 로 공격 타임라인 재구성
 
-> **핵심 기술**: Athena SQL · IR 보고서 산출
-> **난이도**: ⭐⭐⭐
+> **핵심 기술**: Athena SQL · IR 보고서 산출<br>
+> **난이도**: ⭐⭐⭐<br>
 > **본인 AWS 계정 필요**: ✅
 
 ## 🎯 목표

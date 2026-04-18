@@ -1,8 +1,8 @@
 # Level 2 — AuthenticatedUsers 그룹 오남용
 
-> **URL**: http://level2-c8b217a33fcf1f839f6f1f73a00a9ae7.flaws.cloud/
-> **핵심 기술**: S3 ACL / AWS 전역 그룹 / IAM
-> **난이도**: ⭐
+> **URL**: http://level2-c8b217a33fcf1f839f6f1f73a00a9ae7.flaws.cloud/<br>
+> **핵심 기술**: S3 ACL / AWS 전역 그룹 / IAM<br>
+> **난이도**: ⭐<br>
 > **본인 AWS 계정 필요**: ✅
 
 ## 🎯 목표

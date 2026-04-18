@@ -1,7 +1,7 @@
 # Defender Level 2 — jq 로 공격자 IP·Identity 식별
 
-> **핵심 기술**: `jq` · CloudTrail 이벤트 스키마
-> **난이도**: ⭐⭐
+> **핵심 기술**: `jq` · CloudTrail 이벤트 스키마<br>
+> **난이도**: ⭐⭐<br>
 > **본인 AWS 계정 필요**: ❌
 
 ## 🎯 목표

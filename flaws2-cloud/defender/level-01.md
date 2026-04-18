@@ -1,8 +1,8 @@
 # Defender Level 1 — CloudTrail 로그 확보
 
-> **URL**: http://flaws2.cloud/defender.htm
-> **핵심 기술**: CloudTrail 로그 S3 저장소 구조 · `aws s3 sync`
-> **난이도**: ⭐
+> **URL**: http://flaws2.cloud/defender.htm<br>
+> **핵심 기술**: CloudTrail 로그 S3 저장소 구조 · `aws s3 sync`<br>
+> **난이도**: ⭐<br>
 > **본인 AWS 계정 필요**: ❌ (읽기만)
 
 ## 🎯 목표

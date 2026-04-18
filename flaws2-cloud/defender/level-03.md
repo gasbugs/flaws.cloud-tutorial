@@ -1,7 +1,7 @@
 # Defender Level 3 — 악의적 API 호출 패턴
 
-> **핵심 기술**: CloudTrail event 패턴 분석 · IR 가설 수립
-> **난이도**: ⭐⭐
+> **핵심 기술**: CloudTrail event 패턴 분석 · IR 가설 수립<br>
+> **난이도**: ⭐⭐<br>
 > **본인 AWS 계정 필요**: ❌
 
 ## 🎯 목표

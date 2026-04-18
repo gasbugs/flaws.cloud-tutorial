@@ -1,8 +1,8 @@
 # Level 3 — `.git` 디렉터리에서 AWS 키 복원
 
-> **URL**: http://level3-9afd3927f195e10225021a578e6f78df.flaws.cloud/
-> **핵심 기술**: S3 공개 버킷 / Git 히스토리 / 장기 access key
-> **난이도**: ⭐⭐
+> **URL**: http://level3-9afd3927f195e10225021a578e6f78df.flaws.cloud/<br>
+> **핵심 기술**: S3 공개 버킷 / Git 히스토리 / 장기 access key<br>
+> **난이도**: ⭐⭐<br>
 > **본인 AWS 계정 필요**: ❌ (획득한 `flaws` 키 사용)
 
 ## 🎯 목표

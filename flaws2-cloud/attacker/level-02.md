@@ -1,10 +1,10 @@
 # Attacker Level 2 — 공개 ECR 이미지에서 자격증명 추출
 
-> **URL**: http://level2-g9785tw8478k4awxtbox9kk3c5ka8iiz.flaws2.cloud/
-> **타겟 서버**: http://container.target.flaws2.cloud/ (HTTP Basic Auth 로 잠김)
-> **ECR 레포지토리**: `653711331788.dkr.ecr.us-east-1.amazonaws.com/level2`
-> **핵심 기술**: ECR 레포 정책 오설정 · Docker 이미지 레이어 분석
-> **난이도**: ⭐⭐
+> **URL**: http://level2-g9785tw8478k4awxtbox9kk3c5ka8iiz.flaws2.cloud/<br>
+> **타겟 서버**: http://container.target.flaws2.cloud/ (HTTP Basic Auth 로 잠김)<br>
+> **ECR 레포지토리**: `653711331788.dkr.ecr.us-east-1.amazonaws.com/level2`<br>
+> **핵심 기술**: ECR 레포 정책 오설정 · Docker 이미지 레이어 분석<br>
+> **난이도**: ⭐⭐<br>
 > **본인 AWS 계정 필요**: ❌ (Attacker L1 에서 얻은 임시 키로 충분)
 
 ## 🎯 목표
