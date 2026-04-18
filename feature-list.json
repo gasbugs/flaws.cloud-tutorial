@@ -16,7 +16,7 @@
       "name": "AWS 보안 primer",
       "description": "docs/aws-security-primer.md 작성. S3 버킷·ACL/정책, IAM 사용자/역할/정책/STS, IMDS v1/v2, CloudTrail, Lambda/ECS 기본 보안 개념을 한국어로 정리. flaws2 시작 전 필독 문서.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: test_feat-002.sh (섹션/코드블록/플레이스홀더 없음) / 증거: test 출력"
     },
     {
