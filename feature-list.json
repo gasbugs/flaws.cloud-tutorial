@@ -8,7 +8,7 @@
       "name": "저장소 스캐폴드",
       "description": "최상위 README.md, LICENSE(MIT), 디렉터리 구조(docs/, flaws-cloud/, flaws2-cloud/attacker/, flaws2-cloud/defender/, assets/), docs/00-prerequisites.md, tests/e2e/lib/common.sh 공용 테스트 라이브러리를 생성한다.",
       "priority": "high",
-      "passes": false,
+      "passes": true,
       "notes": "검증: tests/e2e/test_feat-001.sh (디렉터리와 필수 파일 존재 확인) / 증거: test 출력 + git log"
     },
     {
